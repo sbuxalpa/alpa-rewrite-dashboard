@@ -712,7 +712,7 @@ const tblSort = {
 Chart.defaults.color = '#5a7499';
 Chart.defaults.font.family = "'Inter', sans-serif";
 
-const months  = RAW.all_months;
+const months = (dashboardData && dashboardData.all_months) ? dashboardData.all_months : [];
 const mLabels = RAW.month_labels;
 
 /* ============================================================
