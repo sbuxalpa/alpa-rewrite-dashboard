@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Policy Rewrite Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ===================== BASE ===================== */
+:root{
+  --bg:#080c14;--surface:#0e1621;--s2:#141e2e;--s3:#1a2640;
+  --border:#1d2d45;--text:#d8e4f5;--muted:#5a7499;
+  --accent:#3b82f6;--gold:#f59e0b;--red:#ef4444;
+  --green:#10b981;--orange:#f97316;--purple:#a855f7;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;line-height:1.5;min-height:100vh;}
+a{color:inherit;text-decoration:none;}
+
+/* ===================== SHARED NAV ===================== */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;
+  border-bottom:1px solid var(--border);background:var(--surface);
+  position:sticky;top:0;z-index:100;gap:12px;flex-wrap:wrap;}
+.topbar-logo{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;letter-spacing:-.3px;}
+.topbar-logo span{color:var(--accent);}
+.topbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.toggle-wrap{display:flex;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:3px;gap:2px;}
+.toggle-btn{padding:5px 14px;border:none;border-radius:5px;cursor:pointer;font-family:'Inter',sans-serif;
+  font-size:11px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;
+  transition:all .15s;background:transparent;color:var(--muted);}
+.toggle-btn.active{background:var(--accent);color:#fff;}
+.date-controls{display:flex;align-items:center;gap:6px;}
+.dlabel{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.5px;text-transform:uppercase;}
+.dsel{background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;
+  padding:5px 8px;font-family:'Inter',sans-serif;font-size:11px;cursor:pointer;}
+
+/* ===================== FILTER BAR ===================== */
+.filter-bar{display:flex;align-items:center;gap:10px;padding:9px 24px;
+  background:var(--s2);border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.flabel{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600;}
+.ms-wrap{position:relative;}
+.ms-trigger{display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--border);
+  color:var(--text);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:11px;
+  min-width:200px;max-width:300px;justify-content:space-between;user-select:none;transition:border-color .15s;}
+.ms-trigger:hover,.ms-trigger.open{border-color:var(--accent);}
+.ms-ttext{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
+.ms-arrow{font-size:9px;color:var(--muted);transition:transform .15s;}
+.ms-trigger.open .ms-arrow{transform:rotate(180deg);}
+.ms-cnt{background:var(--accent);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;}
+.ms-dd{position:absolute;top:calc(100% + 4px);left:0;min-width:280px;background:var(--surface);
+  border:1px solid var(--border);border-radius:8px;z-index:500;box-shadow:0 8px 32px rgba(0,0,0,.6);overflow:hidden;}
+.ms-srch{padding:8px 10px;border-bottom:1px solid var(--border);}
+.ms-srch input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+  border-radius:5px;padding:5px 9px;font-size:11px;font-family:'Inter',sans-serif;outline:none;}
+.ms-srch input:focus{border-color:var(--accent);}
+.ms-srch input::placeholder{color:var(--muted);}
+.ms-acts{display:flex;gap:8px;padding:6px 12px;border-bottom:1px solid var(--border);}
+.ms-ab{font-size:10px;color:var(--accent);cursor:pointer;background:none;border:none;
+  font-family:'Inter',sans-serif;font-weight:600;padding:0;}
+.ms-ab:hover{text-decoration:underline;}
+.ms-list{max-height:240px;overflow-y:auto;padding:4px 0;}
+.ms-list::-webkit-scrollbar{width:4px;}
+.ms-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.ms-item{display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;
+  transition:background .1s;font-size:12px;}
+.ms-item:hover{background:var(--s2);}
+.ms-cb{width:13px;height:13px;border:1.5px solid var(--muted);border-radius:3px;
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-weight:700;}
+.ms-item.checked .ms-cb{background:var(--accent);border-color:var(--accent);}
+.ms-itext{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ms-empty{padding:16px;text-align:center;color:var(--muted);font-size:11px;}
+.stat-pill{background:var(--surface);border:1px solid var(--border);border-radius:20px;
+  padding:3px 10px;font-size:11px;color:var(--muted);margin-left:auto;}
+.stat-pill strong{color:var(--text);}
+
+/* ===================== MAIN DASHBOARD ===================== */
+#dashView{display:block;}
+#detailView{display:none;}
+
+.main{padding:16px 24px;display:flex;flex-direction:column;gap:14px;}
+
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:14px 16px;position:relative;overflow:hidden;}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.kpi.k1::before{background:var(--accent);}
+.kpi.k2::before{background:var(--red);}
+.kpi.k3::before{background:var(--gold);}
+.kpi.k4::before{background:var(--green);}
+.kpi.k5::before{background:var(--purple);}
+.kpi-lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600;margin-bottom:6px;}
+.kpi-val{font-family:'Syne',sans-serif;font-size:26px;font-weight:700;line-height:1;margin-bottom:3px;}
+.kpi.k1 .kpi-val{color:var(--accent);}
+.kpi.k2 .kpi-val{color:var(--red);}
+.kpi.k3 .kpi-val{color:var(--gold);}
+.kpi.k4 .kpi-val{color:var(--green);}
+.kpi.k5 .kpi-val{color:var(--purple);}
+.kpi-sub{font-size:10.5px;color:var(--muted);}
+
+.charts-row{display:grid;grid-template-columns:1.6fr 1fr;gap:12px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
+.card-hd{font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600;margin-bottom:3px;}
+.card-title{font-size:13px;font-weight:600;margin-bottom:12px;}
+
+.table-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.table-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:16px 18px;max-height:420px;overflow:hidden;display:flex;flex-direction:column;}
+.tscroll{overflow-y:auto;flex:1;margin-top:2px;}
+.tscroll::-webkit-scrollbar{width:4px;}
+.tscroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead{position:sticky;top:0;background:var(--surface);z-index:2;}
+thead th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;
+  color:var(--muted);font-weight:600;padding:0 8px 8px;border-bottom:1px solid var(--border);
+  cursor:pointer;user-select:none;white-space:nowrap;}
+thead th:hover{color:var(--text);}
+thead th.r{text-align:right;}
+thead th.sa{color:var(--accent);}
+.si{margin-left:3px;font-size:8px;opacity:.5;}
+thead th.sa .si{opacity:1;}
+tbody tr{border-bottom:1px solid #0f1a28;transition:background .1s;}
+tbody tr.cr{cursor:pointer;}
+tbody tr.cr:hover{background:#172338;}
+tbody td{padding:7px 8px;}
+tbody td.r{text-align:right;}
+.rank{color:var(--muted);font-size:10px;margin-right:3px;font-family:monospace;}
+.ename{font-weight:500;}
+.esub{font-size:10px;color:var(--muted);}
+.badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:700;}
+.r-red{background:rgba(239,68,68,.14);color:var(--red);}
+.r-ora{background:rgba(249,115,22,.14);color:var(--orange);}
+.r-blu{background:rgba(59,130,246,.14);color:var(--accent);}
+.r-grn{background:rgba(16,185,129,.14);color:var(--green);}
+.r-pur{background:rgba(168,85,247,.14);color:var(--purple);}
+.bar-bg{display:inline-block;vertical-align:middle;width:48px;height:4px;
+  background:var(--border);border-radius:2px;margin-left:4px;}
+.bar-fill{height:100%;border-radius:2px;}
+.empty{text-align:center;padding:24px;color:var(--muted);font-size:12px;}
+
+.method-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px;}
+.method-item{background:var(--s2);border-radius:6px;padding:10px 12px;}
+.method-tag{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;}
+.method-desc{font-size:11px;color:var(--muted);line-height:1.4;}
+.footer{text-align:center;color:var(--muted);font-size:10.5px;padding:10px 24px 14px;border-top:1px solid var(--border);}
+
+/* ===================== DETAIL VIEW ===================== */
+#detailView .main{padding:20px 24px;gap:18px;}
+
+.back-btn{display:inline-flex;align-items:center;gap:7px;background:var(--s2);
+  border:1px solid var(--border);color:var(--text);border-radius:7px;
+  padding:8px 14px;cursor:pointer;font-family:'Inter',sans-serif;font-size:12px;
+  font-weight:500;transition:all .15s;}
+.back-btn:hover{background:var(--s3);border-color:var(--accent);color:var(--accent);}
+.back-arrow{font-size:14px;}
+
+.detail-hero{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:22px 26px;display:flex;gap:24px;align-items:flex-start;}
+.hero-left{flex:1;min-width:0;}
+.hero-type{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;
+  color:var(--accent);font-weight:600;margin-bottom:5px;}
+.hero-name{font-family:'Syne',sans-serif;font-size:26px;font-weight:700;
+  line-height:1.2;margin-bottom:5px;}
+.hero-sub{font-size:12px;color:var(--muted);}
+.hero-kpis{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap;}
+.hkpi{background:var(--s2);border-radius:8px;padding:12px 16px;min-width:110px;}
+.hkpi-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600;margin-bottom:5px;}
+.hkpi-val{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;line-height:1;}
+.hkpi-sub{font-size:10px;color:var(--muted);margin-top:2px;}
+
+.detail-grid{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;}
+.detail-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;}
+.detail-card.full{grid-column:1/-1;}
+.sec-title{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:600;margin-bottom:14px;}
+
+/* Trend chart card */
+.trend-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;}
+
+/* Comparison bars */
+.cmp-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12px;}
+.cmp-lbl{width:110px;flex-shrink:0;color:var(--muted);font-size:11px;}
+.cmp-bar-wrap{flex:1;height:8px;background:var(--border);border-radius:4px;position:relative;overflow:visible;}
+.cmp-bar-ent{height:100%;border-radius:4px;position:absolute;top:0;left:0;transition:width .5s ease;}
+.cmp-avg-line{position:absolute;top:-4px;width:2px;height:16px;background:var(--gold);border-radius:1px;z-index:2;}
+.cmp-val{width:44px;text-align:right;font-weight:600;font-size:12px;flex-shrink:0;}
+.cmp-leg{display:flex;gap:14px;margin-top:10px;font-size:10px;color:var(--muted);}
+.cmp-leg span{display:flex;align-items:center;gap:5px;}
+.leg-dot{width:9px;height:9px;border-radius:50%;}
+.leg-line{width:14px;height:2px;background:var(--gold);}
+
+/* Agents grid */
+.agents-list{display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;}
+.agents-list::-webkit-scrollbar{width:4px;}
+.agents-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.agent-item{display:flex;align-items:center;gap:8px;padding:8px 10px;
+  background:var(--s2);border-radius:7px;transition:background .1s;}
+.agent-item:hover{background:var(--s3);}
+.agent-item-link{cursor:pointer;border:1px solid transparent;}
+.agent-item-link:hover{background:var(--s3);border-color:var(--accent);}
+.ai-arrow{color:var(--accent);font-size:13px;margin-left:auto;opacity:0;transition:opacity .15s;}
+.agent-item-link:hover .ai-arrow{opacity:1;}
+.ai-rank{font-size:10px;color:var(--muted);font-family:monospace;width:18px;flex-shrink:0;}
+.ai-name{flex:1;font-weight:500;font-size:12px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ai-dps{font-size:11px;color:var(--muted);flex-shrink:0;width:52px;text-align:right;}
+
+/* Customer list */
+.cust-list{display:flex;flex-direction:column;gap:5px;max-height:320px;overflow-y:auto;}
+.cust-list::-webkit-scrollbar{width:4px;}
+.cust-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.cust-item{display:flex;align-items:center;gap:8px;padding:8px 10px;
+  background:var(--s2);border-radius:7px;}
+.ci-num{font-size:10px;color:var(--muted);font-family:monospace;width:18px;flex-shrink:0;}
+.ci-name{flex:1;font-size:12px;font-weight:500;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ci-count{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;flex-shrink:0;}
+.ci-date{font-size:10px;color:var(--muted);flex-shrink:0;}
+.ci-badge{flex-shrink:0;}
+
+/* Customer detail table */
+.cust-table-wrap{overflow-x:auto;max-height:380px;overflow-y:auto;}
+.cust-table-wrap::-webkit-scrollbar{width:4px;height:4px;}
+.cust-table-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.cust-table{width:100%;border-collapse:collapse;font-size:12px;}
+.cust-table thead{position:sticky;top:0;background:var(--surface);z-index:2;}
+.cust-table thead th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;
+  color:var(--muted);font-weight:600;padding:0 10px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+.cust-table thead th.ct-r{text-align:right;}
+.cust-table thead th.ct-rew{color:var(--red);}
+.cust-table thead th.ct-exp{color:var(--orange);}
+.cust-table thead th.ct-win{color:var(--green);}
+.cust-table tbody tr{border-bottom:1px solid #0f1a28;transition:background .1s;}
+.cust-table tbody tr:hover{background:var(--s2);}
+.cust-table tbody td{padding:8px 10px;vertical-align:middle;}
+.cust-table .ct-num{color:var(--muted);font-size:10px;font-family:monospace;width:24px;}
+.cust-table .ct-name{font-weight:500;min-width:140px;}
+.cust-table .ct-date{font-size:11px;color:var(--muted);white-space:nowrap;}
+.cust-table .ct-r{text-align:right;font-family:monospace;font-size:13px;}
+</style>
+</head>
+<body>
+
+<!-- ======================== DASHBOARD VIEW ======================== -->
+<div id="dashView">
+  <div class="topbar">
+    <div class="topbar-logo">Rewrite <span>Intelligence</span> Dashboard</div>
+    <div class="topbar-right">
+      <div class="date-controls">
+        <span class="dlabel">From</span>
+        <select class="dsel" id="dateFrom" onchange="render()"></select>
+        <span class="dlabel" style="margin:0 2px">→</span>
+        <select class="dsel" id="dateTo" onchange="render()"></select>
+      </div>
+      <div class="toggle-wrap">
+        <button class="toggle-btn active" id="btnAgent" onclick="setView('agent')">Agents</button>
+        <button class="toggle-btn" id="btnOffice" onclick="setView('office')">Offices</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <span class="flabel">Filter</span>
+    <div class="ms-wrap" id="agentMsWrap">
+      <div class="ms-trigger" id="agentTrigger" onclick="toggleMs('agent')">
+        <span class="ms-ttext" id="agentTtext">All agents</span>
+        <span class="ms-cnt" id="agentCnt" style="display:none"></span>
+        <span class="ms-arrow">▼</span>
+      </div>
+      <div class="ms-dd" id="agentDd" style="display:none">
+        <div class="ms-srch"><input id="agentSrch" placeholder="Search agents…" oninput="buildList('agent')" onclick="event.stopPropagation()"></div>
+        <div class="ms-acts"><button class="ms-ab" onclick="selAll('agent')">Select All</button><button class="ms-ab" onclick="clearSel('agent')">Clear All</button></div>
+        <div class="ms-list" id="agentList"></div>
+      </div>
+    </div>
+    <div class="ms-wrap" id="officeMsWrap" style="display:none">
+      <div class="ms-trigger" id="officeTrigger" onclick="toggleMs('office')">
+        <span class="ms-ttext" id="officeTtext">All offices</span>
+        <span class="ms-cnt" id="officeCnt" style="display:none"></span>
+        <span class="ms-arrow">▼</span>
+      </div>
+      <div class="ms-dd" id="officeDd" style="display:none">
+        <div class="ms-srch"><input id="officeSrch" placeholder="Search offices…" oninput="buildList('office')" onclick="event.stopPropagation()"></div>
+        <div class="ms-acts"><button class="ms-ab" onclick="selAll('office')">Select All</button><button class="ms-ab" onclick="clearSel('office')">Clear All</button></div>
+        <div class="ms-list" id="officeList"></div>
+      </div>
+    </div>
+    <div class="stat-pill" id="statPill">Loading…</div>
+  </div>
+
+  <div class="main">
+    <div class="kpi-row">
+      <div class="kpi k1"><div class="kpi-lbl">Total DPs</div><div class="kpi-val" id="kTotal">—</div><div class="kpi-sub" id="kTotalSub"></div></div>
+      <div class="kpi k2"><div class="kpi-lbl">Rewrite Rate</div><div class="kpi-val" id="kRate">—</div><div class="kpi-sub" id="kRateSub"></div></div>
+      <div class="kpi k3"><div class="kpi-lbl">Explainable Rate</div><div class="kpi-val" id="kExp">—</div><div class="kpi-sub" id="kExpSub"></div></div>
+      <div class="kpi k4"><div class="kpi-lbl">Winback Rate</div><div class="kpi-val" id="kWin">—</div><div class="kpi-sub" id="kWinSub"></div></div>
+      <div class="kpi k5"><div class="kpi-lbl" id="kEntLbl">Entities</div><div class="kpi-val" id="kEnt">—</div><div class="kpi-sub" id="kEntSub"></div></div>
+    </div>
+
+    <div class="charts-row">
+      <div class="card"><div class="card-hd">Monthly Trend</div><div class="card-title">Classification by Month</div><canvas id="trendChart" height="210"></canvas></div>
+      <div class="card"><div class="card-hd">Overall Mix</div><div class="card-title">Classification Breakdown</div><canvas id="donutChart" height="210"></canvas></div>
+    </div>
+
+    <div class="table-row">
+      <div class="table-card">
+        <div class="card-hd">Risk Ranking</div>
+        <div class="card-title" id="riskTitle">Top by Rewrite Rate <span style="font-size:10px;color:var(--accent);font-weight:400">· click a row to drill in</span></div>
+        <div class="tscroll"><table><thead><tr id="riskHead"></tr></thead><tbody id="riskBody"></tbody></table></div>
+      </div>
+      <div class="table-card">
+        <div class="card-hd">Volume Leaders</div>
+        <div class="card-title" id="volTitle">Top by Volume <span style="font-size:10px;color:var(--accent);font-weight:400">· click a row to drill in</span></div>
+        <div class="tscroll"><table><thead><tr id="volHead"></tr></thead><tbody id="volBody"></tbody></table></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd">Classification Mix</div>
+      <div class="card-title" id="mixTitle">Top 20 by Volume</div>
+      <canvas id="stackedBar" height="90"></canvas>
+    </div>
+
+    <div class="card" style="border-left:3px solid var(--gold);">
+      <div class="card-hd" style="color:var(--gold)">Classification Methodology</div>
+      <div class="method-grid">
+        <div class="method-item"><div class="method-tag" style="color:var(--accent)">First</div><div class="method-desc">Initial DP — no prior history</div></div>
+        <div class="method-item"><div class="method-tag" style="color:var(--red)">Rewrite</div><div class="method-desc">Subsequent DP within <strong style="color:var(--text)">120 days</strong></div></div>
+        <div class="method-item"><div class="method-tag" style="color:var(--orange)">Explainable</div><div class="method-desc">DP within <strong style="color:var(--text)">121–180 days</strong></div></div>
+        <div class="method-item"><div class="method-tag" style="color:var(--green)">Winback</div><div class="method-desc">DP after <strong style="color:var(--text)">180+ days</strong></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">Data Source: rewrite_final_analysis.xlsx · Rewrite % = Rewrites ÷ Total Down Payments</div>
+</div><!-- end dashView -->
+
+
+<!-- ======================== DETAIL VIEW ======================== -->
+<div id="detailView">
+  <div class="topbar">
+    <div class="topbar-logo">Rewrite <span>Intelligence</span> Dashboard</div>
+    <div class="topbar-right">
+      <button class="back-btn" id="backBtn" onclick="goBack()"><span class="back-arrow">←</span> Back to Dashboard</button>
+    </div>
+  </div>
+
+  <div class="main" id="detailMain"></div>
+  <div class="footer">Data Source: rewrite_final_analysis.xlsx · Rewrite % = Rewrites ÷ Total Down Payments</div>
+</div><!-- end detailView -->
+
+
+<script>
+/* ============================================================
+   DATA
+   ============================================================ */
+
+/* ============================================================
+   GOOGLE SHEETS LIVE DATA ENGINE
+   ============================================================
+   HOW TO CONFIGURE:
+   1. Open your Google Sheet
+   2. File → Share → Publish to web
+   3. Choose "Sheet1" (or whichever sheet has the raw data)
+   4. Choose "Comma-separated values (.csv)"
+   5. Click "Publish" and copy the URL
+   6. Paste it below as SHEET_URL
+   ============================================================ */
+
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbw-MV_5lkuCqMOXmLQkWE1bnIzHSQR41pROZGbMYwfKK543bP_tnxdhnOXotcGgreNh8A/exec';
+
+// Classification thresholds (days)
+const REWRITE_DAYS     = 120;
+const EXPLAINABLE_DAYS = 180;
+
+// These are populated after data loads
+let RAW    = null;
+let DETAIL = null;
+let ALL_AGENTS  = [];
+let ALL_OFFICES = [];
+
+/* ── CSV PARSER ─────────────────────────────────────────── */
+function parseCSV(text) {
+  const lines = text.split('\n').filter(l => l.trim());
+  if (!lines.length) return [];
+
+  // Parse a single CSV line respecting quoted fields
+  function parseLine(line) {
+    const fields = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') { inQ = !inQ; }
+      else if (ch === ',' && !inQ) { fields.push(cur.trim()); cur = ''; }
+      else { cur += ch; }
+    }
+    fields.push(cur.trim());
+    return fields;
+  }
+
+  // The raw report format:
+  // Row 0 = header row (first cell contains the title text + "Date")
+  // Rows 1+ = data rows (first column is empty)
+  // Expected columns (0-indexed):
+  //  0=title/empty  1=Date  2=Receipt#  3=BankAccount  4=PolicyNumber
+  //  5=CustomerName  6=email  7=PaymentFor  8=PaymentMethod  9=Company
+  //  10=SentToCompany  11=Amount  12=ReceivedBy  13=AgencyName  14=Location
+  //  15=FeeType  16=Fee  17=Total  18=Balance  19=PolicyType
+  //  20=ReferralSource  21=PaymentNotes  22=PolicyStatus
+
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {  // skip header row
+    const f = parseLine(lines[i]);
+    if (f.length < 13) continue;
+    const payFor = (f[7] || '').trim();
+    if (payFor !== 'Down Payment') continue;  // only down payments
+
+    const dateStr = (f[1] || '').trim();
+    const date    = parseDate(dateStr);
+    if (!date) continue;
+
+    rows.push({
+      date:       date,
+      dateStr:    dateStr,
+      policy:     (f[4] || '').trim().replace(/^['"\s]+|['"\s]+$/g, ''),
+      custName:   (f[5] || '').trim(),
+      email:      (f[6] || '').trim().toLowerCase(),
+      agent:      (f[12] || '').trim(),
+      office:     (f[13] || '').trim(),
+    });
+  }
+  return rows;
+}
+
+function parseDate(str) {
+  // Handles M/D/YYYY and YYYY-MM-DD
+  if (!str) return null;
+  let m;
+  m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return new Date(+m[3], +m[1]-1, +m[2]);
+  m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  return null;
+}
+
+/* ── CUSTOMER KEY ───────────────────────────────────────── */
+function custKey(row) {
+  const email = row.email.replace(/\s/g, '');
+  if (email && email !== 'nan') return email;
+  return row.custName.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/* ── CLASSIFICATION ENGINE ──────────────────────────────── */
+function classify(rows) {
+  // Sort by customer key then date
+  rows.sort((a, b) => {
+    const ka = custKey(a), kb = custKey(b);
+    if (ka < kb) return -1;
+    if (ka > kb) return 1;
+    return a.date - b.date;
+  });
+
+  const prevDate = {};
+  for (const row of rows) {
+    const ck = custKey(row);
+    row.cust_key = ck;
+    if (!prevDate[ck]) {
+      row.classification = 'First';
+    } else {
+      const gap = Math.round((row.date - prevDate[ck]) / 86400000);
+      if      (gap <= REWRITE_DAYS)     row.classification = 'Rewrite';
+      else if (gap <= EXPLAINABLE_DAYS) row.classification = 'Explainable Rewrite';
+      else                               row.classification = 'Winback';
+    }
+    prevDate[ck] = row.date;
+    row.month = row.date.toISOString().slice(0, 7); // YYYY-MM
+  }
+  return rows;
+}
+
+/* ── AGGREGATION ────────────────────────────────────────── */
+function monthLabel(m) {
+  const d = new Date(m + '-01');
+  return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+}
+
+function buildMainData(rows) {
+  const agentMap  = {}, officeMap = {};
+
+  for (const r of rows) {
+    const mo = r.month;
+    const cls = r.classification;
+    const f = cls === 'First' ? 1 : 0;
+    const rw = cls === 'Rewrite' ? 1 : 0;
+    const ex = cls === 'Explainable Rewrite' ? 1 : 0;
+    const wb = cls === 'Winback' ? 1 : 0;
+
+    // Agent rows
+    const ak = r.agent + '||' + mo;
+    if (!agentMap[ak]) agentMap[ak] = {agent:r.agent, office:r.office, month:mo, first:0,rewrite:0,exp:0,winback:0,total:0};
+    const ae = agentMap[ak];
+    ae.first+=f; ae.rewrite+=rw; ae.exp+=ex; ae.winback+=wb; ae.total++;
+
+    // Office rows
+    const ok = r.office + '||' + mo;
+    if (!officeMap[ok]) officeMap[ok] = {office:r.office, month:mo, first:0,rewrite:0,exp:0,winback:0,total:0};
+    const oe = officeMap[ok];
+    oe.first+=f; oe.rewrite+=rw; oe.exp+=ex; oe.winback+=wb; oe.total++;
+  }
+
+  const allMonths = [...new Set(rows.map(r => r.month))].sort();
+  const monthLabels = {};
+  allMonths.forEach(m => monthLabels[m] = monthLabel(m));
+
+  return {
+    all_months:   allMonths,
+    month_labels: monthLabels,
+    agent_rows:   Object.values(agentMap),
+    office_rows:  Object.values(officeMap),
+  };
+}
+
+function buildDetailData(rows) {
+  // Helper: monthly breakdown for a group of rows
+  function monthlyDetail(grp) {
+    const map = {};
+    for (const r of grp) {
+      if (!map[r.month]) map[r.month] = {first:0,rewrite:0,exp:0,winback:0,total:0};
+      const m = map[r.month];
+      if (r.classification==='First') m.first++;
+      else if (r.classification==='Rewrite') m.rewrite++;
+      else if (r.classification==='Explainable Rewrite') m.exp++;
+      else if (r.classification==='Winback') m.winback++;
+      m.total++;
+    }
+    return map;
+  }
+
+  // Helper: top rewrite customers for a group
+  function topCustomers(grp, n=15) {
+    const rewRows = grp.filter(r => r.classification==='Rewrite'||r.classification==='Explainable Rewrite');
+    const custMap = {};
+    for (const r of grp) {
+      const ck = r.cust_key;
+      if (!custMap[ck]) custMap[ck] = {
+        name: r.custName.substring(0,35),
+        dates: [], rewrite:0, explainable:0, winback:0, total:0
+      };
+      const c = custMap[ck];
+      c.dates.push(r.date);
+      c.total++;
+      if (r.classification==='Rewrite') c.rewrite++;
+      else if (r.classification==='Explainable Rewrite') c.explainable++;
+      else if (r.classification==='Winback') c.winback++;
+    }
+    // Only customers who have ≥1 rewrite or explainable
+    const rewCustKeys = new Set(rewRows.map(r => r.cust_key));
+    return Object.entries(custMap)
+      .filter(([ck]) => rewCustKeys.has(ck))
+      .map(([ck, c]) => ({
+        name:        c.name,
+        first_date:  new Date(Math.min(...c.dates)).toISOString().slice(0,10),
+        latest_date: new Date(Math.max(...c.dates)).toISOString().slice(0,10),
+        rewrite:     c.rewrite,
+        explainable: c.explainable,
+        winback:     c.winback,
+        total:       c.total,
+      }))
+      .sort((a,b) => (b.rewrite+b.explainable) - (a.rewrite+a.explainable))
+      .slice(0, n);
+  }
+
+  // Group by agent
+  const agentGroups = {};
+  for (const r of rows) {
+    if (!agentGroups[r.agent]) agentGroups[r.agent] = [];
+    agentGroups[r.agent].push(r);
+  }
+
+  // Group by office
+  const officeGroups = {};
+  for (const r of rows) {
+    if (!officeGroups[r.office]) officeGroups[r.office] = [];
+    officeGroups[r.office].push(r);
+  }
+
+  const agentDetail = {};
+  for (const [agent, grp] of Object.entries(agentGroups)) {
+    const officeCounts = {};
+    for (const r of grp) officeCounts[r.office] = (officeCounts[r.office]||0)+1;
+    agentDetail[agent] = {
+      monthly:       monthlyDetail(grp),
+      top_customers: topCustomers(grp),
+      offices:       officeCounts,
+    };
+  }
+
+  const officeDetail = {};
+  for (const [office, grp] of Object.entries(officeGroups)) {
+    const agentStats = {};
+    for (const r of grp) {
+      if (!agentStats[r.agent]) agentStats[r.agent] = {name:r.agent, total:0, rewrite:0};
+      agentStats[r.agent].total++;
+      if (r.classification==='Rewrite') agentStats[r.agent].rewrite++;
+    }
+    const agents = Object.values(agentStats).map(a => ({
+      ...a,
+      rewrite_pct: a.total > 0 ? parseFloat((a.rewrite/a.total*100).toFixed(1)) : 0
+    })).sort((a,b) => b.rewrite_pct - a.rewrite_pct).slice(0,20);
+
+    officeDetail[office] = {
+      monthly:       monthlyDetail(grp),
+      agents:        agents,
+      top_customers: topCustomers(grp),
+    };
+  }
+
+  return { agent: agentDetail, office: officeDetail };
+}
+
+/* ── LOADING UI ─────────────────────────────────────────── */
+function showLoader(msg) {
+  document.getElementById('loaderOverlay').style.display = 'flex';
+  document.getElementById('loaderMsg').textContent = msg;
+}
+function hideLoader() {
+  document.getElementById('loaderOverlay').style.display = 'none';
+}
+function showError(msg) {
+  document.getElementById('loaderOverlay').style.display = 'flex';
+  document.getElementById('loaderIcon').textContent = '⚠';
+  document.getElementById('loaderIcon').style.color = 'var(--red)';
+  document.getElementById('loaderMsg').textContent = msg;
+  document.getElementById('loaderSub').textContent = 'Check the SHEET_URL in the HTML file and make sure the sheet is published as CSV.';
+  document.getElementById('loaderSpin').style.display = 'none';
+}
+
+/* ── FETCH & PROCESS ────────────────────────────────────── */
+async function loadSheetData() {
+  if (!SHEET_URL || SHEET_URL.includes('YOUR_GOOGLE_SHEET')) {
+    showError('Google Sheet URL not configured.');
+    return;
+  }
+
+  showLoader('Fetching data from Google Sheets…');
+
+  let csvText;
+  try {
+    const resp = await fetch(SHEET_URL, { cache: 'no-store' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    csvText = await resp.text();
+    if (!csvText || csvText.length < 10) throw new Error('Empty response');
+  } catch (err) {
+    showError('Could not load data: ' + err.message);
+    return;
+  }
+
+  showLoader('Parsing & classifying payments…');
+  await new Promise(r => setTimeout(r, 10)); // let UI update
+
+  const rows = parseCSV(csvText);
+  if (!rows.length) {
+    showError('No Down Payment rows found. Check your sheet has the expected format.');
+    return;
+  }
+
+  classify(rows);
+
+  showLoader('Building dashboard…');
+  await new Promise(r => setTimeout(r, 10));
+
+  RAW    = buildMainData(rows);
+  DETAIL = buildDetailData(rows);
+  ALL_AGENTS  = [...new Set(rows.map(r => r.agent))].sort();
+  ALL_OFFICES = [...new Set(rows.map(r => r.office))].sort();
+
+  hideLoader();
+
+  // Show last-updated time
+  const now = new Date().toLocaleString();
+  document.getElementById('lastUpdated').textContent = 'Last updated: ' + now;
+
+  // Boot the dashboard
+  init();
+}
+
+/* ── REFRESH BUTTON ─────────────────────────────────────── */
+function refreshData() {
+  // Reset state and reload
+  RAW = null; DETAIL = null;
+  ALL_AGENTS = []; ALL_OFFICES = [];
+  agentSel = null; officeSel = null;
+  loadSheetData();
+}
+
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let view      = 'agent';
+let agentSel  = null;   // null = all, Set = specific selection
+let officeSel = null;
+let overallTot= {first:0,rewrite:0,exp:0,winback:0,total:0};
+let cachedEnt = [];
+
+// Chart instances
+let trendCh, donutCh, stackCh, detailTrendCh;
+
+// Table sort state
+const tblSort = {
+  risk: {col:'rewrite_pct', dir:'desc'},
+  vol:  {col:'total',       dir:'desc'}
+};
+
+Chart.defaults.color = '#5a7499';
+Chart.defaults.font.family = "'Inter', sans-serif";
+
+const months  = RAW.all_months;
+const mLabels = RAW.month_labels;
+
+/* ============================================================
+   INIT
+   ============================================================ */
+function init(){
+  ['dateFrom','dateTo'].forEach(id=>{
+    const el=document.getElementById(id);
+    months.forEach(m=>el.appendChild(new Option(mLabels[m],m)));
+  });
+  document.getElementById('dateFrom').value = months[0];
+  document.getElementById('dateTo').value   = months[months.length-1];
+  buildTableHeaders();
+  buildList('agent');
+  buildList('office');
+  render();
+}
+
+function getRange(){
+  const f=document.getElementById('dateFrom').value, t=document.getElementById('dateTo').value;
+  return f<=t?[f,t]:[t,f];
+}
+
+/* ============================================================
+   VIEW TOGGLE (agent / office)
+   ============================================================ */
+function setView(v){
+  view=v;
+  document.getElementById('btnAgent').classList.toggle('active',v==='agent');
+  document.getElementById('btnOffice').classList.toggle('active',v==='office');
+  document.getElementById('agentMsWrap').style.display  = v==='agent'  ?'':'none';
+  document.getElementById('officeMsWrap').style.display = v==='office' ?'':'none';
+  tblSort.risk={col:'rewrite_pct',dir:'desc'};
+  tblSort.vol ={col:'total',      dir:'desc'};
+  render();
+}
+
+/* ============================================================
+   MULTISELECT
+   ============================================================ */
+function toggleMs(type){
+  const dd=document.getElementById(type+'Dd');
+  const tr=document.getElementById(type+'Trigger');
+  const open=dd.style.display!=='none';
+  closeAllMs();
+  if(!open){
+    dd.style.display='';
+    tr.classList.add('open');
+    document.getElementById(type+'Srch').value='';
+    buildList(type);
+    document.getElementById(type+'Srch').focus();
+  }
+}
+function closeAllMs(){
+  ['agent','office'].forEach(t=>{
+    document.getElementById(t+'Dd').style.display='none';
+    document.getElementById(t+'Trigger').classList.remove('open');
+  });
+}
+document.addEventListener('click',e=>{if(!e.target.closest('.ms-wrap'))closeAllMs();});
+
+function buildList(type){
+  const all  = type==='agent'?ALL_AGENTS:ALL_OFFICES;
+  const sel  = type==='agent'?agentSel:officeSel;
+  const q    = document.getElementById(type+'Srch').value.toLowerCase();
+  const listEl=document.getElementById(type+'List');
+  const items= all.filter(i=>i.toLowerCase().includes(q));
+  listEl.innerHTML='';
+  if(!items.length){listEl.innerHTML='<div class="ms-empty">No results</div>';return;}
+  items.forEach(item=>{
+    const checked=sel===null||sel.has(item);
+    const div=document.createElement('div');
+    div.className='ms-item'+(checked?' checked':'');
+    const label=type==='agent'?(item.includes(':')?item.split(':').slice(1).join(':').trim():item):item;
+    div.innerHTML='<div class="ms-cb">'+(checked?'✓':'')+'</div><div class="ms-itext" title="'+item+'">'+label+'</div>';
+    div.onclick=e=>{e.stopPropagation();toggleItem(type,item);};
+    listEl.appendChild(div);
+  });
+}
+
+function toggleItem(type,item){
+  const all=type==='agent'?ALL_AGENTS:ALL_OFFICES;
+  let sel=type==='agent'?agentSel:officeSel;
+  if(sel===null){sel=new Set(all.filter(i=>i!==item));}
+  else if(sel.has(item)){sel.delete(item);}
+  else{sel.add(item);if(sel.size===all.length)sel=null;}
+  if(type==='agent')agentSel=sel;else officeSel=sel;
+  updateTrigger(type);buildList(type);render();
+}
+function selAll(type){
+  if(type==='agent')agentSel=null;else officeSel=null;
+  updateTrigger(type);buildList(type);render();
+}
+function clearSel(type){
+  if(type==='agent')agentSel=new Set();else officeSel=new Set();
+  updateTrigger(type);buildList(type);render();
+}
+function updateTrigger(type){
+  const sel=type==='agent'?agentSel:officeSel;
+  const txt=document.getElementById(type+'Ttext');
+  const cnt=document.getElementById(type+'Cnt');
+  if(sel===null){txt.textContent='All '+type+'s';cnt.style.display='none';}
+  else if(sel.size===0){txt.textContent='None selected';cnt.style.display='none';}
+  else{
+    const n=sel.size;
+    txt.textContent=n===1?([...sel][0].includes(':')?[...sel][0].split(':').slice(1).join(':').trim():[...sel][0]):n+' selected';
+    cnt.textContent=n;cnt.style.display='';
+  }
+}
+
+/* ============================================================
+   DATA AGGREGATION
+   ============================================================ */
+function aggregate(range){
+  const [from,to]=range;
+  const isAgent=view==='agent';
+  const rows=isAgent?RAW.agent_rows:RAW.office_rows;
+  const sel=isAgent?agentSel:officeSel;
+  const key=isAgent?'agent':'office';
+  const map={};
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];
+    if(r.month<from||r.month>to)continue;
+    const k=r[key];
+    if(sel!==null&&!sel.has(k))continue;
+    if(!map[k])map[k]={name:k,office:isAgent?r.office:'',first:0,rewrite:0,exp:0,winback:0,total:0};
+    const e=map[k];
+    e.first+=r.first;e.rewrite+=r.rewrite;e.exp+=r.exp;e.winback+=r.winback;e.total+=r.total;
+  }
+  return Object.values(map).map(e=>({...e,rewrite_pct:e.total>0?parseFloat((e.rewrite/e.total*100).toFixed(1)):0}));
+}
+
+function monthlyTotals(range){
+  const [from,to]=range;
+  const isAgent=view==='agent';
+  const rows=isAgent?RAW.agent_rows:RAW.office_rows;
+  const sel=isAgent?agentSel:officeSel;
+  const key=isAgent?'agent':'office';
+  const map={};
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];
+    if(r.month<from||r.month>to)continue;
+    if(sel!==null&&!sel.has(r[key]))continue;
+    if(!map[r.month])map[r.month]={first:0,rewrite:0,exp:0,winback:0,total:0};
+    const m=map[r.month];
+    m.first+=r.first;m.rewrite+=r.rewrite;m.exp+=r.exp;m.winback+=r.winback;m.total+=r.total;
+  }
+  return map;
+}
+
+/* ============================================================
+   TABLES
+   ============================================================ */
+const COLS=['name','total','rewrite','exp','winback','rewrite_pct'];
+const CLBLS={name:'#',total:'DPs',rewrite:'Rewrites',exp:'Expl.',winback:'Winback',rewrite_pct:'Rate'};
+
+function buildTableHeaders(){
+  ['risk','vol'].forEach(tbl=>{
+    const hr=document.getElementById(tbl+'Head');hr.innerHTML='';
+    COLS.forEach(col=>{
+      const th=document.createElement('th');
+      if(col!=='name')th.className='r';
+      th.id=tbl+'Th_'+col;
+      th.innerHTML=CLBLS[col]+' <span class="si" id="'+tbl+'Si_'+col+'">↕</span>';
+      th.onclick=()=>sortTable(tbl,col);
+      hr.appendChild(th);
+    });
+  });
+}
+
+function sortTable(tbl,col){
+  const s=tblSort[tbl];
+  if(s.col===col)s.dir=s.dir==='desc'?'asc':'desc';
+  else{s.col=col;s.dir=col==='name'?'asc':'desc';}
+  renderTables();
+}
+
+function updateSortInds(){
+  ['risk','vol'].forEach(tbl=>{
+    const {col,dir}=tblSort[tbl];
+    COLS.forEach(c=>{
+      const th=document.getElementById(tbl+'Th_'+c);
+      const si=document.getElementById(tbl+'Si_'+c);
+      if(!th||!si)return;
+      th.classList.toggle('sa',c===col);
+      si.textContent=c===col?(dir==='desc'?'↓':'↑'):'↕';
+      si.style.opacity=c===col?'1':'0.4';
+    });
+  });
+}
+
+function applySort(ents,tbl){
+  const {col,dir}=tblSort[tbl];
+  return [...ents].sort((a,b)=>{
+    let av=col==='name'?a.name.toLowerCase():a[col];
+    let bv=col==='name'?b.name.toLowerCase():b[col];
+    if(av<bv)return dir==='asc'?-1:1;
+    if(av>bv)return dir==='asc'?1:-1;
+    return 0;
+  });
+}
+
+function pctBadge(p){
+  const bc=p>=25?'r-red':p>=20?'r-ora':p>=15?'r-pur':'r-blu';
+  const bw=Math.min(100,p/40*100);
+  const bc2=p>=25?'var(--red)':p>=20?'var(--orange)':'var(--accent)';
+  return '<span class="badge '+bc+'">'+p+'%</span>'
+    +'<span class="bar-bg"><span class="bar-fill" style="width:'+bw+'%;background:'+bc2+'"></span></span>';
+}
+
+function renderTables(){
+  const isAgent=view==='agent';
+  const riskEnt=applySort(cachedEnt.filter(e=>e.total>=5),'risk').slice(0,25);
+  const volEnt =applySort(cachedEnt,'vol').slice(0,25);
+
+  [['riskBody',riskEnt],['volBody',volEnt]].forEach(([id,list])=>{
+    const tb=document.getElementById(id);tb.innerHTML='';
+    if(!list.length){tb.innerHTML='<tr><td colspan="6" class="empty">No data</td></tr>';return;}
+    list.forEach((e,i)=>{
+      const sn=isAgent?(e.name.includes(':')?e.name.split(':').slice(1).join(':').trim():e.name):e.name;
+      const tr=document.createElement('tr');
+      tr.className='cr';
+      tr.title='Click to view details';
+      tr.onclick=()=>openDetail(e.name);
+      tr.innerHTML='<td><span class="rank">'+(i+1)+'</span><span class="ename">'+sn+'</span>'
+        +(isAgent?'<div class="esub">'+e.office+'</div>':'')+'</td>'
+        +'<td class="r">'+e.total.toLocaleString()+'</td>'
+        +'<td class="r">'+e.rewrite.toLocaleString()+'</td>'
+        +'<td class="r">'+e.exp.toLocaleString()+'</td>'
+        +'<td class="r">'+e.winback.toLocaleString()+'</td>'
+        +'<td class="r">'+pctBadge(e.rewrite_pct)+'</td>';
+      tb.appendChild(tr);
+    });
+  });
+  updateSortInds();
+}
+
+/* ============================================================
+   MAIN RENDER
+   ============================================================ */
+function render(){
+  const range=getRange(),[from,to]=range;
+  const isAgent=view==='agent',label=isAgent?'Agents':'Offices';
+  const ents=aggregate(range);
+  cachedEnt=ents;
+
+  document.getElementById('kEntLbl').textContent=label;
+  document.getElementById('riskTitle').innerHTML='Top '+label+' by Rewrite Rate <span style="font-size:10px;color:var(--accent);font-weight:400">· click a row to drill in</span>';
+  document.getElementById('volTitle').innerHTML='Top '+label+' by Volume <span style="font-size:10px;color:var(--accent);font-weight:400">· click a row to drill in</span>';
+  document.getElementById('mixTitle').textContent='Top 20 '+label+' by Volume';
+
+  const tot=ents.reduce((a,e)=>({first:a.first+e.first,rewrite:a.rewrite+e.rewrite,
+    exp:a.exp+e.exp,winback:a.winback+e.winback,total:a.total+e.total}),
+    {first:0,rewrite:0,exp:0,winback:0,total:0});
+  overallTot=tot;
+  const pct=n=>tot.total>0?(n/tot.total*100).toFixed(1)+'%':'—';
+
+  document.getElementById('kTotal').textContent=tot.total.toLocaleString();
+  document.getElementById('kTotalSub').textContent=mLabels[from]+' → '+mLabels[to];
+  document.getElementById('kRate').textContent=pct(tot.rewrite);
+  document.getElementById('kRateSub').textContent=tot.rewrite.toLocaleString()+' rewrites';
+  document.getElementById('kExp').textContent=pct(tot.exp);
+  document.getElementById('kExpSub').textContent=tot.exp.toLocaleString()+' explainable';
+  document.getElementById('kWin').textContent=pct(tot.winback);
+  document.getElementById('kWinSub').textContent=tot.winback.toLocaleString()+' winbacks';
+  document.getElementById('kEnt').textContent=ents.length;
+  document.getElementById('kEntSub').textContent='with activity';
+  document.getElementById('statPill').innerHTML='Showing <strong>'+ents.length+'</strong> '+label.toLowerCase();
+
+  const mTot=monthlyTotals(range);
+  const activeMo=months.filter(m=>m>=from&&m<=to);
+  const mL=activeMo.map(m=>mLabels[m]);
+  const mF=activeMo.map(m=>(mTot[m]||{}).first||0);
+  const mR=activeMo.map(m=>(mTot[m]||{}).rewrite||0);
+  const mE=activeMo.map(m=>(mTot[m]||{}).exp||0);
+  const mW=activeMo.map(m=>(mTot[m]||{}).winback||0);
+
+  const mTotals=activeMo.map((_,i)=>mF[i]+mR[i]+mE[i]+mW[i]);
+  const mRewPct=mTotals.map((t,i)=>t>0?parseFloat((mR[i]/t*100).toFixed(1)):null);
+  const datasets=[
+    {label:'First',      data:mF,backgroundColor:'rgba(59,130,246,0.7)', borderRadius:2, stack:'s1', type:'bar'},
+    {label:'Rewrite',    data:mR,backgroundColor:'rgba(239,68,68,0.85)',  borderRadius:2, stack:'s1', type:'bar'},
+    {label:'Explainable',data:mE,backgroundColor:'rgba(249,115,22,0.8)', borderRadius:2, stack:'s1', type:'bar'},
+    {label:'Winback',    data:mW,backgroundColor:'rgba(16,185,129,0.8)', borderRadius:2, stack:'s1', type:'bar'},
+    {label:'Rewrite %',  data:mRewPct, type:'line', borderColor:'rgba(248,220,80,0.9)', backgroundColor:'transparent',
+     borderWidth:2, pointRadius:3, pointBackgroundColor:'rgba(248,220,80,1)', tension:0.3,
+     yAxisID:'y2', stack:undefined},
+  ];
+  const baseOpts={responsive:true,plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:12,font:{size:10}}},
+    tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>{
+      if(ctx.dataset.label==='Rewrite %') return ' Rewrite %: '+(ctx.parsed.y!==null?ctx.parsed.y+'%':'—');
+      return ' '+ctx.dataset.label+': '+ctx.parsed.y;
+    }}}},
+    scales:{
+      x:{stacked:true,grid:{color:'#111d2e'},ticks:{font:{size:10}}},
+      y:{stacked:true,grid:{color:'#111d2e'},ticks:{font:{size:10}}},
+      y2:{type:'linear',position:'right',grid:{drawOnChartArea:false},
+          ticks:{font:{size:9},callback:v=>v+'%'},
+          min:0,title:{display:true,text:'Rewrite %',font:{size:9},color:'rgba(248,220,80,0.7)'}}
+    }};
+
+  if(trendCh)trendCh.destroy();
+  trendCh=new Chart(document.getElementById('trendChart'),{type:'bar',data:{labels:mL,datasets},options:baseOpts});
+
+  if(donutCh)donutCh.destroy();
+  donutCh=new Chart(document.getElementById('donutChart'),{type:'doughnut',
+    data:{labels:['First','Rewrite','Explainable','Winback'],datasets:[{
+      data:[tot.first,tot.rewrite,tot.exp,tot.winback],
+      backgroundColor:['rgba(59,130,246,0.8)','rgba(239,68,68,0.85)','rgba(249,115,22,0.8)','rgba(16,185,129,0.8)'],
+      borderColor:'#0e1621',borderWidth:2,hoverOffset:6}]},
+    options:{responsive:true,cutout:'62%',plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:12,font:{size:10}}},
+      tooltip:{callbacks:{label:ctx=>' '+ctx.label+': '+ctx.parsed.toLocaleString()+
+        ' ('+(tot.total>0?(ctx.parsed/tot.total*100).toFixed(1):'0')+'%)'}}}}});
+
+  renderTables();
+
+  const barTop=[...ents].sort((a,b)=>b.total-a.total).slice(0,20);
+  const bL=barTop.map(e=>isAgent?(e.name.includes(':')?e.name.split(':').slice(1).join(':').trim():e.name).substring(0,12):e.name.substring(0,14));
+  if(stackCh)stackCh.destroy();
+  stackCh=new Chart(document.getElementById('stackedBar'),{type:'bar',
+    data:{labels:bL,datasets:[
+      {label:'First',      data:barTop.map(e=>e.first),  backgroundColor:'rgba(59,130,246,0.7)',borderRadius:2},
+      {label:'Rewrite',    data:barTop.map(e=>e.rewrite),backgroundColor:'rgba(239,68,68,0.85)', borderRadius:2},
+      {label:'Explainable',data:barTop.map(e=>e.exp),   backgroundColor:'rgba(249,115,22,0.8)', borderRadius:2},
+      {label:'Winback',    data:barTop.map(e=>e.winback),backgroundColor:'rgba(16,185,129,0.8)',borderRadius:2},
+    ]},
+    options:{responsive:true,plugins:{legend:{position:'top',labels:{boxWidth:9,padding:14,font:{size:10}}},
+      tooltip:{mode:'index',intersect:false}},
+      scales:{x:{stacked:true,grid:{color:'#111d2e'},ticks:{font:{size:9},maxRotation:35,minRotation:20}},
+              y:{stacked:true,grid:{color:'#111d2e'},ticks:{font:{size:10}}}}}});
+}
+
+/* ============================================================
+   DETAIL VIEW
+   ============================================================ */
+function openDetail(entityName, pushToStack=true){
+  const isAgent=view==='agent';
+  const detail=isAgent?DETAIL.agent[entityName]:DETAIL.office[entityName];
+  const entityData=cachedEnt.find(e=>e.name===entityName)||{first:0,rewrite:0,exp:0,winback:0,total:0,rewrite_pct:0,office:''};
+  const ed=entityData;
+  const range=getRange(),[from,to]=range;
+
+  // Display name
+  const dname=isAgent&&entityName.includes(':')?entityName.split(':').slice(1).join(':').trim():entityName;
+
+  // Push dash state to stack when drilling from main dashboard
+  if(pushToStack) navStack.length = 0; // fresh navigation from dashboard
+
+  // Build monthly data for this entity from detail
+  const activeMo=months.filter(m=>m>=from&&m<=to);
+  const mo=detail?detail.monthly:{};
+  const mF=activeMo.map(m=>(mo[m]||{}).first||0);
+  const mR=activeMo.map(m=>(mo[m]||{}).rewrite||0);
+  const mE=activeMo.map(m=>(mo[m]||{}).exp||0);
+  const mW=activeMo.map(m=>(mo[m]||{}).winback||0);
+  const mL=activeMo.map(m=>mLabels[m]);
+
+  // Overall averages
+  const avgRew=overallTot.total>0?parseFloat((overallTot.rewrite/overallTot.total*100).toFixed(1)):0;
+  const avgExp=overallTot.total>0?parseFloat((overallTot.exp/overallTot.total*100).toFixed(1)):0;
+  const avgWin=overallTot.total>0?parseFloat((overallTot.winback/overallTot.total*100).toFixed(1)):0;
+  const entRew=ed.rewrite_pct;
+  const entExp=ed.total>0?parseFloat((ed.exp/ed.total*100).toFixed(1)):0;
+  const entWin=ed.total>0?parseFloat((ed.winback/ed.total*100).toFixed(1)):0;
+
+  // Build detail HTML
+  const container=document.getElementById('detailMain');
+  container.innerHTML='';
+
+  // Back button row — label changes based on whether we came from another detail page
+  const backRow=document.createElement('div');
+  const backLabel = navStack.length > 0 ? 'Back to Office' : 'Back to Dashboard';
+  backRow.innerHTML='<button class="back-btn" id="backBtn" onclick="goBack()"><span class="back-arrow">←</span> ' + backLabel + '</button>';
+  container.appendChild(backRow);
+
+  // Hero card
+  const hero=document.createElement('div');
+  hero.className='detail-hero';
+  hero.innerHTML=`
+    <div class="hero-left">
+      <div class="hero-type">${isAgent?'Agent':'Office'} Detail</div>
+      <div class="hero-name">${dname}</div>
+      <div class="hero-sub">${isAgent?'Primary office: '+ed.office:'Date range: '+mLabels[from]+' → '+mLabels[to]}</div>
+      <div class="hero-kpis">
+        <div class="hkpi"><div class="hkpi-lbl">Total DPs</div><div class="hkpi-val" style="color:var(--accent)">${ed.total.toLocaleString()}</div><div class="hkpi-sub">down payments</div></div>
+        <div class="hkpi"><div class="hkpi-lbl">Rewrite Rate</div><div class="hkpi-val" style="color:var(--red)">${entRew}%</div><div class="hkpi-sub">${ed.rewrite} rewrites</div></div>
+        <div class="hkpi"><div class="hkpi-lbl">Winbacks</div><div class="hkpi-val" style="color:var(--green)">${ed.winback}</div><div class="hkpi-sub">returning customers</div></div>
+        <div class="hkpi"><div class="hkpi-lbl">Explainable</div><div class="hkpi-val" style="color:var(--orange)">${ed.exp}</div><div class="hkpi-sub">mid-term changes</div></div>
+      </div>
+    </div>`;
+  container.appendChild(hero);
+
+  // Main grid
+  const grid=document.createElement('div');
+  grid.className='detail-grid';
+  container.appendChild(grid);
+
+  // --- 1. MONTHLY TREND ---
+  const trendCard=document.createElement('div');
+  trendCard.className='detail-card';
+  trendCard.innerHTML='<div class="sec-title">Monthly Activity Trend</div><canvas id="detailTrendCanvas" height="200"></canvas>';
+  grid.appendChild(trendCard);
+
+  // --- 2. VS AVERAGE ---
+  const maxPct=Math.max(entRew,entExp,entWin,avgRew,avgExp,avgWin,1)*1.3;
+  function cmpRow(lbl,ev,av,col){
+    const ew=Math.min(100,ev/maxPct*100).toFixed(1);
+    const ap=Math.min(100,av/maxPct*100).toFixed(1);
+    const diff=ev>av?'+':'';
+    return `<div class="cmp-row">
+      <span class="cmp-lbl">${lbl}</span>
+      <span class="cmp-bar-wrap">
+        <span class="cmp-bar-ent" style="width:${ew}%;background:${col};opacity:0.8"></span>
+        <span class="cmp-avg-line" style="left:${ap}%"></span>
+      </span>
+      <span class="cmp-val" style="color:${col}">${diff}${(ev-av).toFixed(1)}%</span>
+    </div>`;
+  }
+  const cmpCard=document.createElement('div');
+  cmpCard.className='detail-card';
+  cmpCard.innerHTML=`<div class="sec-title">vs Overall Average</div>
+    ${cmpRow('Rewrite %',entRew,avgRew,'var(--red)')}
+    ${cmpRow('Explainable %',entExp,avgExp,'var(--orange)')}
+    ${cmpRow('Winback %',entWin,avgWin,'var(--green)')}
+    <div class="cmp-leg">
+      <span><span class="leg-dot" style="background:var(--accent)"></span>This ${isAgent?'agent':'office'} (bar length = rate)</span>
+      <span><span class="leg-line"></span>Overall avg (gold line)</span>
+      <span style="color:var(--text)">Value shown = difference from avg</span>
+    </div>`;
+  grid.appendChild(cmpCard);
+
+  // --- 3. AGENT BREAKDOWN (office view only) ---
+  if(!isAgent && detail && detail.agents && detail.agents.length){
+    const agCard=document.createElement('div');
+    agCard.className='detail-card full';
+    const agentRows=detail.agents.slice(0,20).map((a,i)=>{
+      const sn=a.name.includes(':')?a.name.split(':').slice(1).join(':').trim():a.name;
+      const p=a.rewrite_pct;
+      return `<div class="agent-item agent-item-link" onclick="drillToAgent('${a.name.replace(/'/g,"\'")}')">
+        <span class="ai-rank">${i+1}</span>
+        <span class="ai-name">${sn}</span>
+        <span class="ai-dps">${a.total} DPs</span>
+        <span>${pctBadge(p)}</span>
+        <span class="ai-arrow">→</span>
+      </div>`;
+    }).join('');
+    agCard.innerHTML=`<div class="sec-title">Agents at this Office — Ranked by Rewrite Rate <span style="font-weight:300;color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0">· click an agent to view their detail</span></div>
+      <div class="agents-list">${agentRows}</div>`;
+    grid.appendChild(agCard);
+  }
+
+  // --- 4. TOP REWRITE CUSTOMERS (enhanced) ---
+  if(detail && detail.top_customers && detail.top_customers.length){
+    const custCard=document.createElement('div');
+    custCard.className='detail-card full';
+    const tableRows=detail.top_customers.map((c,i)=>{
+      const rBg=c.rewrite>0?'color:var(--red);font-weight:700':'color:var(--muted)';
+      const eBg=c.explainable>0?'color:var(--orange);font-weight:700':'color:var(--muted)';
+      const wBg=c.winback>0?'color:var(--green);font-weight:700':'color:var(--muted)';
+      return `<tr>
+        <td class="ct-num">${i+1}</td>
+        <td class="ct-name">${c.name}</td>
+        <td class="ct-date">${c.first_date}</td>
+        <td class="ct-date">${c.latest_date}</td>
+        <td class="ct-r ct-rew" style="${rBg}">${c.rewrite}</td>
+        <td class="ct-r ct-exp" style="${eBg}">${c.explainable}</td>
+        <td class="ct-r ct-win" style="${wBg}">${c.winback}</td>
+        <td class="ct-r">${c.total}</td>
+      </tr>`;
+    }).join('');
+    custCard.innerHTML=`<div class="sec-title">Repeat Rewrite Customers <span style="font-weight:300;color:var(--muted);font-size:10px;text-transform:none;letter-spacing:0">— customers with at least one rewrite at this ${isAgent?'agent':'office'}</span></div>
+      <div class="cust-table-wrap">
+        <table class="cust-table">
+          <thead>
+            <tr>
+              <th class="ct-num">#</th>
+              <th class="ct-name">Customer Name</th>
+              <th>First Policy</th>
+              <th>Latest Policy</th>
+              <th class="ct-r ct-rew">Rewrites</th>
+              <th class="ct-r ct-exp">Explainable</th>
+              <th class="ct-r ct-win">Winbacks</th>
+              <th class="ct-r">Total DPs</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>`;
+    grid.appendChild(custCard);
+  }
+
+  // Switch views
+  window.scrollTo(0,0);
+  document.getElementById('dashView').style.display='none';
+  document.getElementById('detailView').style.display='block';
+
+  // Render trend chart after DOM is visible
+  requestAnimationFrame(()=>{
+    const dTotals=mL.map((_,i)=>mF[i]+mR[i]+mE[i]+mW[i]);
+    const dRewPct=dTotals.map((t,i)=>t>0?parseFloat((mR[i]/t*100).toFixed(1)):null);
+    if(detailTrendCh)detailTrendCh.destroy();
+    detailTrendCh=new Chart(document.getElementById('detailTrendCanvas'),{
+      type:'bar',
+      data:{labels:mL,datasets:[
+        {label:'First',      data:mF,backgroundColor:'rgba(59,130,246,0.7)',borderRadius:2,stack:'s1',type:'bar'},
+        {label:'Rewrite',    data:mR,backgroundColor:'rgba(239,68,68,0.85)', borderRadius:2,stack:'s1',type:'bar'},
+        {label:'Explainable',data:mE,backgroundColor:'rgba(249,115,22,0.8)', borderRadius:2,stack:'s1',type:'bar'},
+        {label:'Winback',    data:mW,backgroundColor:'rgba(16,185,129,0.8)', borderRadius:2,stack:'s1',type:'bar'},
+        {label:'Rewrite %',  data:dRewPct,type:'line',borderColor:'rgba(248,220,80,0.9)',
+         backgroundColor:'transparent',borderWidth:2,pointRadius:3,
+         pointBackgroundColor:'rgba(248,220,80,1)',tension:0.3,yAxisID:'y2',stack:undefined},
+      ]},
+      options:{responsive:true,
+        plugins:{legend:{position:'bottom',labels:{boxWidth:9,padding:10,font:{size:10}}},
+          tooltip:{mode:'index',intersect:false,callbacks:{label:ctx=>{
+            if(ctx.dataset.label==='Rewrite %') return ' Rewrite %: '+(ctx.parsed.y!==null?ctx.parsed.y+'%':'—');
+            return ' '+ctx.dataset.label+': '+ctx.parsed.y;
+          }}}},
+        scales:{
+          x:{stacked:true,grid:{color:'#111d2e'},ticks:{font:{size:9}}},
+          y:{stacked:true,grid:{color:'#111d2e'},ticks:{font:{size:9}}},
+          y2:{type:'linear',position:'right',grid:{drawOnChartArea:false},
+              ticks:{font:{size:9},callback:v=>v+'%'},min:0,
+              title:{display:true,text:'Rewrite %',font:{size:9},color:'rgba(248,220,80,0.7)'}}
+        }}
+    });
+  });
+}
+
+// navStack stores the full state needed to re-render a page
+// Each entry: { entityName, viewAtTime, cachedEntAtTime }
+const navStack = [];
+
+function drillToAgent(agentName){
+  // Save the CURRENT office detail page to the stack so we can return to it
+  const currentHeroName = document.getElementById('detailMain').querySelector('.hero-name')?.textContent || '';
+  navStack.push({
+    entityName: currentHeroName,
+    viewAtTime: view,              // 'office'
+    cachedEntAtTime: [...cachedEnt]
+  });
+
+  // Switch to agent view, aggregate agent data, open agent detail
+  view = 'agent';
+  const [from,to] = getRange();
+  const map = {};
+  for(let i=0;i<RAW.agent_rows.length;i++){
+    const r=RAW.agent_rows[i];
+    if(r.month<from||r.month>to) continue;
+    if(!map[r.agent]) map[r.agent]={name:r.agent,office:r.office,first:0,rewrite:0,exp:0,winback:0,total:0};
+    const e=map[r.agent];
+    e.first+=r.first;e.rewrite+=r.rewrite;e.exp+=r.exp;e.winback+=r.winback;e.total+=r.total;
+  }
+  cachedEnt = Object.values(map).map(e=>({...e, rewrite_pct:e.total>0?parseFloat((e.rewrite/e.total*100).toFixed(1)):0}));
+  openDetail(agentName, false);
+}
+
+function goBack(){
+  if(navStack.length > 0){
+    // Restore previous page from stack
+    const prev = navStack.pop();
+    view      = prev.viewAtTime;
+    cachedEnt = prev.cachedEntAtTime;
+    openDetail(prev.entityName, false);
+    return;
+  }
+  // Nothing in stack → go back to main dashboard
+  document.getElementById('detailView').style.display='none';
+  document.getElementById('dashView').style.display='block';
+  window.scrollTo(0,0);
+}
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+loadSheetData();
+</script>
+</body>
+</html>
